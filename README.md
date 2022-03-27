@@ -26,7 +26,7 @@ Each of the individual features isn't spectacular, but in combination I've found
 - can use multiple instances with different configurations 
 - context aware, including cancel and shutdown
 - support for timeouts both at the httpclient and higher levels
-- support for plugging in a circuitbreaker (not included with this library, see [go-autumn-restclient-gobreaker](https://github.com/StephanHCB/go-autumn-restclient-gobreaker))
+- support for plugging in a circuitbreaker (not included with this library, see [go-autumn-restclient-circuitbreaker](https://github.com/StephanHCB/go-autumn-restclient-circuitbreaker))
 - conditional retry (using a callback so you're flexible about the retry condition)
 - support for context aware request logging
 - support for pre-request header/request manipulation (using a callback)
@@ -37,7 +37,7 @@ Each of the individual features isn't spectacular, but in combination I've found
 
 ## Usage
 
-TODO
+Please see the [examples](https://github.com/StephanHCB/go-autumn-restclient/tree/main/example).
 
 ## Logging
 
