@@ -10,8 +10,8 @@ type RetryImpl struct {
 	Wrapped     aurestclientapi.Client
 	RepeatCount uint8
 
-	Condition   aurestclientapi.RetryConditionCallback
-	BeforeRetry aurestclientapi.BeforeRetryCallback
+	RetryCondition aurestclientapi.RetryConditionCallback
+	BeforeRetry    aurestclientapi.BeforeRetryCallback
 }
 
 func New(
@@ -21,10 +21,10 @@ func New(
 	beforeRetryOrNil aurestclientapi.BeforeRetryCallback,
 ) aurestclientapi.Client {
 	return &RetryImpl{
-		Wrapped:     wrapped,
-		RepeatCount: repeatCount,
-		Condition:   condition,
-		BeforeRetry: beforeRetryOrNil,
+		Wrapped:        wrapped,
+		RepeatCount:    repeatCount,
+		RetryCondition: condition,
+		BeforeRetry:    beforeRetryOrNil,
 	}
 }
 
@@ -34,11 +34,14 @@ func (c *RetryImpl) Perform(ctx context.Context, method string, requestUrl strin
 	for attempt = 1; attempt <= c.RepeatCount+1; attempt++ {
 		err = c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
 
-		if c.Condition(ctx, response, err) {
+		if c.RetryCondition(ctx, response, err) {
 			if attempt == c.RepeatCount+1 {
 				aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("giving up on %s %s after attempt %d", method, requestUrl, attempt)
 				return err
 			}
+		} else {
+			// no retry needed
+			return err
 		}
 
 		if c.BeforeRetry != nil {

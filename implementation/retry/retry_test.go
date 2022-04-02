@@ -68,6 +68,23 @@ func TestSuccessWithRetry(t *testing.T) {
 	require.Equal(t, []string{r, r, r}, aurestmock.GetRecording(mock))
 }
 
+func TestSuccessWithNotNeededRetry(t *testing.T) {
+	aulogging.SetupNoLoggerForTesting()
+
+	mock := tstMock()
+	cut := New(mock, 2,
+		func(ctx context.Context, response *aurestclientapi.ParsedResponse, err error) bool {
+			return false
+		},
+		nil)
+
+	response := &aurestclientapi.ParsedResponse{}
+	err := cut.Perform(context.Background(), "GET", "http://ok", nil, response)
+	require.Nil(t, err)
+	r := "GET http://ok <nil>"
+	require.Equal(t, []string{r}, aurestmock.GetRecording(mock))
+}
+
 func TestFailNoRetry(t *testing.T) {
 	aulogging.SetupNoLoggerForTesting()
 
