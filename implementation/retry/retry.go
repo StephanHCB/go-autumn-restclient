@@ -35,6 +35,7 @@ func (c *RetryImpl) Perform(ctx context.Context, method string, requestUrl strin
 		err = c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
 
 		if c.RetryCondition(ctx, response, err) {
+			// (*)
 			if attempt == c.RepeatCount+1 {
 				aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("giving up on %s %s after attempt %d", method, requestUrl, attempt)
 				return err
@@ -53,5 +54,6 @@ func (c *RetryImpl) Perform(ctx context.Context, method string, requestUrl strin
 			}
 		}
 	}
+	// this line is actually unreachable, see (*) but go doesn't understand this
 	return err
 }

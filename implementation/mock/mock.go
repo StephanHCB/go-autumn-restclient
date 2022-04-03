@@ -9,16 +9,16 @@ import (
 )
 
 type MockImpl struct {
-	recording []string
+	recording     []string
 	mockResponses map[string]aurestclientapi.ParsedResponse
-	mockErrors map[string]error
+	mockErrors    map[string]error
 }
 
 func New(mockResponses map[string]aurestclientapi.ParsedResponse, mockErrors map[string]error) aurestclientapi.Client {
 	return &MockImpl{
-		recording: make([]string, 0),
+		recording:     make([]string, 0),
 		mockResponses: mockResponses,
-		mockErrors: mockErrors,
+		mockErrors:    mockErrors,
 	}
 }
 
@@ -55,3 +55,9 @@ func GetRecording(mock aurestclientapi.Client) []string {
 	}
 }
 
+func ResetRecording(mock aurestclientapi.Client) {
+	mockImpl, ok := mock.(*MockImpl)
+	if ok {
+		mockImpl.recording = make([]string, 0)
+	}
+}

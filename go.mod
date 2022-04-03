@@ -6,6 +6,7 @@ require (
 	github.com/StephanHCB/go-autumn-logging v0.1.2
 	github.com/go-http-utils/headers v0.0.0-20181008091004-fed159eddc2a
 	github.com/stretchr/testify v1.7.1
+	github.com/tidwall/tinylru v1.1.0
 )
 
 require (

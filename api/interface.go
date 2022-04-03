@@ -10,9 +10,9 @@ var ContentTypeApplicationXWwwFormUrlencoded = "application/x-www-form-urlencode
 
 type ParsedResponse struct {
 	// Body is an optional reference that you can pre-fill with a reference to a suitable type, and we'll do tolerant reading
-	Body    interface{}
-	Status  int
-	Header  http.Header
+	Body   interface{}
+	Status int
+	Header http.Header
 }
 
 // Client is a utility class representing a http client.
@@ -35,7 +35,7 @@ type Client interface {
 // RequestManipulatorCallback is an optional function you can provide that manipulates the http request
 // before it is sent.
 //
-// Argument of goauresthttpclient.New(). It is allowed to pass in nil for no manipulator.
+// Argument of auresthttpclient.New(). It is allowed to pass in nil for no manipulator.
 //
 // Use this callback to set extra headers on the request, perhaps Authorization or pass on the Request Id for tracing.
 // You can do anything with the request, really.
@@ -43,7 +43,7 @@ type RequestManipulatorCallback func(ctx context.Context, r *http.Request)
 
 // RetryConditionCallback is a function you need to provide that determines whether a retry should be attempted.
 //
-// Argument of goaurestretry.New()
+// Argument of aurestretry.New()
 //
 // Only useful if you actually place such a retry instance on the stack, which should go above the
 // circuit breaker, if any.
@@ -55,9 +55,32 @@ type RetryConditionCallback func(ctx context.Context, response *ParsedResponse, 
 // BeforeRetryCallback gets called with the response and error between a failure and a retry, but not before
 // the first attempt.
 //
-// Argument of goaurestretry.New(). It is allowed to pass in nil for no callback.
+// Argument of aurestretry.New(). It is allowed to pass in nil for no callback.
 //
 // Only useful if you actually place a retry instance on the stack, which should go above the circuit breaker, if any.
 //
 // If you return an error, the retry won't proceed and the error gets returned. It is ok to pass through originalError.
 type BeforeRetryCallback func(ctx context.Context, originalResponse *ParsedResponse, originalError error) error
+
+// CacheConditionCallback gets called to determine whether a given request should be looked up
+// in the cache before making it for real.
+//
+// Argument of aurestcaching.New(). Cannot be nil.
+//
+// Return true to visit the cache (warning, may give you old state and not resend identical requests).
+//
+// Return false to always make the real request.
+type CacheConditionCallback func(ctx context.Context, method string, url string, requestBody interface{}) bool
+
+// CacheResponseConditionCallback gets called after a successful request (no error) to determine
+// whether the result should be cached.
+//
+// This only gets called if CacheConditionCallback was already true, because otherwise the request is not relevant
+// for the cache.
+//
+// Argument of aurestcaching.New(). Cannot be nil.
+//
+// Return true to put the response in the cache.
+//
+// Return false to not store it (maybe it's a 404 or something).
+type CacheResponseConditionCallback func(ctx context.Context, method string, url string, requestBody interface{}, response *ParsedResponse) bool
