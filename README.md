@@ -28,12 +28,13 @@ Each of the individual features isn't spectacular, but in combination I've found
 - support for timeouts both at the httpclient and higher levels
 - support for plugging in a circuitbreaker (not included with this library, see [go-autumn-restclient-circuitbreaker](https://github.com/StephanHCB/go-autumn-restclient-circuitbreaker))
 - conditional retry (using a callback so you're flexible about the retry condition)
+- support for plugging in a request cache
 - support for context aware request logging
 - support for pre-request header/request manipulation (using a callback)
 - auto marshalling and unmarshalling for both application/json (pass in a struct) and x-www-form-urlencoded (pass in url.Values)
 - support for custom CA certificate chains (configuration per instance, so you can even have one instance with the
   default certs and one with a custom CA chain)
-- integration with   
+- integration with go-autumn-logging
 
 ## Usage
 
