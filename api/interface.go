@@ -84,3 +84,12 @@ type CacheConditionCallback func(ctx context.Context, method string, url string,
 //
 // Return false to not store it (maybe it's a 404 or something).
 type CacheResponseConditionCallback func(ctx context.Context, method string, url string, requestBody interface{}, response *ParsedResponse) bool
+
+// CacheKeyFunction allows you to override the default key generator function, which is based only on
+// method and url.
+//
+// Argument of aurestcaching.New(). May be nil.
+//
+// You must return a unique string that is used as the cache key. If two requests map to the same key, you will get
+// weird behaviour.
+type CacheKeyFunction func(ctx context.Context, method string, url string, requestBody interface{}) string

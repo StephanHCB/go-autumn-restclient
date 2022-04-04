@@ -66,6 +66,7 @@ func tstCut(mock aurestclientapi.Client) aurestclientapi.Client {
 		func(ctx context.Context, method string, url string, requestBody interface{}, response *aurestclientapi.ParsedResponse) bool {
 			return strings.Contains(url, "cache-me") && response.Status == 200
 		},
+		nil,
 		100*time.Millisecond,
 		10,
 	)
