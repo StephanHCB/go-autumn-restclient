@@ -5,6 +5,7 @@ import (
 	"errors"
 	aulogging "github.com/StephanHCB/go-autumn-logging"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
+	aurestcapture "github.com/StephanHCB/go-autumn-restclient/implementation/capture"
 	aurestmock "github.com/StephanHCB/go-autumn-restclient/implementation/mock"
 	"github.com/go-http-utils/headers"
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,7 @@ import (
 )
 
 func tstMock() aurestclientapi.Client {
-	return aurestmock.New(
+	mockClient := aurestmock.New(
 		map[string]aurestclientapi.ParsedResponse{
 			"GET http://ok <nil>": {
 				Body:   nil,
@@ -33,6 +34,8 @@ func tstMock() aurestclientapi.Client {
 			"GET http://err <nil>": errors.New("some transport error"),
 		},
 	)
+	recordingMockClient := aurestcapture.New(mockClient)
+	return recordingMockClient
 }
 
 func TestSuccessNoRetry(t *testing.T) {
@@ -48,7 +51,7 @@ func TestSuccessNoRetry(t *testing.T) {
 	response := &aurestclientapi.ParsedResponse{}
 	err := cut.Perform(context.Background(), "GET", "http://ok", nil, response)
 	require.Nil(t, err)
-	require.Equal(t, []string{"GET http://ok <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://ok <nil>"}, aurestcapture.GetRecording(mock))
 }
 
 func TestSuccessWithRetry(t *testing.T) {
@@ -65,7 +68,7 @@ func TestSuccessWithRetry(t *testing.T) {
 	err := cut.Perform(context.Background(), "GET", "http://ok", nil, response)
 	require.Nil(t, err)
 	r := "GET http://ok <nil>"
-	require.Equal(t, []string{r, r, r}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{r, r, r}, aurestcapture.GetRecording(mock))
 }
 
 func TestSuccessWithNotNeededRetry(t *testing.T) {
@@ -82,7 +85,7 @@ func TestSuccessWithNotNeededRetry(t *testing.T) {
 	err := cut.Perform(context.Background(), "GET", "http://ok", nil, response)
 	require.Nil(t, err)
 	r := "GET http://ok <nil>"
-	require.Equal(t, []string{r}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{r}, aurestcapture.GetRecording(mock))
 }
 
 func TestFailNoRetry(t *testing.T) {
@@ -98,7 +101,7 @@ func TestFailNoRetry(t *testing.T) {
 	response := &aurestclientapi.ParsedResponse{}
 	err := cut.Perform(context.Background(), "GET", "http://err", nil, response)
 	require.Equal(t, "some transport error", err.Error())
-	require.Equal(t, []string{"GET http://err <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://err <nil>"}, aurestcapture.GetRecording(mock))
 }
 
 func TestFailWithRetry(t *testing.T) {
@@ -121,7 +124,7 @@ func TestFailWithRetry(t *testing.T) {
 	require.NotNil(t, err)
 	require.Equal(t, "some transport error", err.Error())
 	r := "GET http://err <nil>"
-	require.Equal(t, []string{r, r, r, r}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{r, r, r, r}, aurestcapture.GetRecording(mock))
 }
 
 func TestAbortRetry(t *testing.T) {
@@ -140,5 +143,5 @@ func TestAbortRetry(t *testing.T) {
 	err := cut.Perform(context.Background(), "GET", "http://err", nil, response)
 	require.NotNil(t, err)
 	r := "GET http://err <nil>"
-	require.Equal(t, []string{r}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{r}, aurestcapture.GetRecording(mock))
 }

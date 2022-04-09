@@ -6,6 +6,7 @@ import (
 	"fmt"
 	aulogging "github.com/StephanHCB/go-autumn-logging"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
+	aurestcapture "github.com/StephanHCB/go-autumn-restclient/implementation/capture"
 	aurestmock "github.com/StephanHCB/go-autumn-restclient/implementation/mock"
 	"github.com/go-http-utils/headers"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ import (
 )
 
 func tstMock() aurestclientapi.Client {
-	return aurestmock.New(
+	mockClient := aurestmock.New(
 		map[string]aurestclientapi.ParsedResponse{
 			"GET http://ok <nil>": {
 				Body:   nil,
@@ -56,6 +57,8 @@ func tstMock() aurestclientapi.Client {
 			"GET http://cache-me/err <nil>": errors.New("some transport error"),
 		},
 	)
+	recordingMockClient := aurestcapture.New(mockClient)
+	return recordingMockClient
 }
 
 func tstCut(mock aurestclientapi.Client) aurestclientapi.Client {
@@ -78,31 +81,31 @@ func TestSuccessCacheHitAndMiss(t *testing.T) {
 	mock := tstMock()
 	cut := tstCut(mock)
 
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response := &aurestclientapi.ParsedResponse{
 		Body: &[]string{},
 	}
 	err := cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
 	require.Nil(t, err)
 	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
-	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestcapture.GetRecording(mock))
 
 	// now do something else
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response = &aurestclientapi.ParsedResponse{}
 	err = cut.Perform(context.Background(), "GET", "http://ok", nil, response)
 	require.Nil(t, err)
-	require.Equal(t, []string{"GET http://ok <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://ok <nil>"}, aurestcapture.GetRecording(mock))
 
 	// now try a second time, this time should hit the cache, so we shouldn't see a request, but get the response
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response = &aurestclientapi.ParsedResponse{
 		Body: &[]string{},
 	}
 	err = cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
 	require.Nil(t, err)
 	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
-	require.Equal(t, []string{}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{}, aurestcapture.GetRecording(mock))
 }
 
 func TestErrorsAreNotCached(t *testing.T) {
@@ -111,18 +114,18 @@ func TestErrorsAreNotCached(t *testing.T) {
 	mock := tstMock()
 	cut := tstCut(mock)
 
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response := &aurestclientapi.ParsedResponse{}
 	err := cut.Perform(context.Background(), "GET", "http://cache-me/err", nil, response)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"GET http://cache-me/err <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me/err <nil>"}, aurestcapture.GetRecording(mock))
 
 	// now try a second time, should go out again because the cache doesn't store failed requests
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response = &aurestclientapi.ParsedResponse{}
 	err = cut.Perform(context.Background(), "GET", "http://cache-me/err", nil, response)
 	require.NotNil(t, err)
-	require.Equal(t, []string{"GET http://cache-me/err <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me/err <nil>"}, aurestcapture.GetRecording(mock))
 }
 
 func TestStoreResponseConditionWorks(t *testing.T) {
@@ -131,19 +134,19 @@ func TestStoreResponseConditionWorks(t *testing.T) {
 	mock := tstMock()
 	cut := tstCut(mock)
 
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response := &aurestclientapi.ParsedResponse{}
 	err := cut.Perform(context.Background(), "GET", "http://cache-me/404", nil, response)
 	require.Nil(t, err)
-	require.Equal(t, []string{"GET http://cache-me/404 <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me/404 <nil>"}, aurestcapture.GetRecording(mock))
 	require.Equal(t, 404, response.Status)
 
 	// now try a second time, should go out again because the store condition was false (we set it up not to store != 200)
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response = &aurestclientapi.ParsedResponse{}
 	err = cut.Perform(context.Background(), "GET", "http://cache-me/404", nil, response)
 	require.Nil(t, err)
-	require.Equal(t, []string{"GET http://cache-me/404 <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me/404 <nil>"}, aurestcapture.GetRecording(mock))
 	require.Equal(t, 404, response.Status)
 }
 
@@ -153,35 +156,35 @@ func TestCacheDeletion(t *testing.T) {
 	mock := tstMock()
 	cut := tstCut(mock)
 
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response := &aurestclientapi.ParsedResponse{
 		Body: &[]string{},
 	}
 	err := cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
 	require.Nil(t, err)
 	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
-	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestcapture.GetRecording(mock))
 
 	// now try a second time, this time should hit the cache, so we shouldn't see a request, but get the response
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response = &aurestclientapi.ParsedResponse{
 		Body: &[]string{},
 	}
 	err = cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
 	require.Nil(t, err)
 	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
-	require.Equal(t, []string{}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{}, aurestcapture.GetRecording(mock))
 
 	// now wait until cache entry has aged
 	time.Sleep(110 * time.Millisecond)
 
 	// now try a third time, this time should go out again, because cache age
-	aurestmock.ResetRecording(mock)
+	aurestcapture.ResetRecording(mock)
 	response = &aurestclientapi.ParsedResponse{
 		Body: &[]string{},
 	}
 	err = cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
 	require.Nil(t, err)
 	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
-	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestmock.GetRecording(mock))
+	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestcapture.GetRecording(mock))
 }

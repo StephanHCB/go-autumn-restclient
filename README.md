@@ -89,7 +89,7 @@ This includes header values and http status, and even the errors returned by the
 Useful for integration testing.
 
 ```
-    playbackHttpClient := aurestplayback.New("../resources/http-recordings/")
+    playbackClient := aurestplayback.New("../resources/http-recordings/")
 ```
 
 _The only parameter is the path to a directory that contains the recordings._
@@ -106,7 +106,7 @@ Useful for unit testing.
     var mockResponses map[string]aurestclientapi.ParsedResponse = ...
     var mockErrors map[string]error = ...
     
-    mockHttpClient := aurestmock.New(mockResponses, mockErrors)
+    mockClient := aurestmock.New(mockResponses, mockErrors)
 ```
 
 #### 2. Response recording
@@ -120,6 +120,17 @@ If the variable is set, recording files will be written into the directory it po
 
 ```
     recorderClient := aurestrecorder.New(httpClient)
+```
+
+#### 2a. Request capture
+
+This will provide your tests with a recording of requests made, allowing you to assert which requests
+were made, in which order.
+
+Only useful for testing.
+
+```
+	requestCaptureClient := aurestcapture.New(playbackClient) // or mockClient
 ```
 
 #### 3. Request logging
@@ -164,6 +175,9 @@ the maximum number of attempts, the retry `condition` is still evaluated but the
     var beforeRetry aurestclientapi.BeforeRetryCallback = nil
     
     retryingClient := aurestretry.New(requestLoggingClient, repeatCount, condition, beforeRetry)
+    
+    // or if you have the circuit breaker in the stack, pass in cbClient instead of requestLoggingClient
+    // retryingClient := aurestretry.New(cbClient, repeatCount, condition, beforeRetry)
 ```
 
 ## Logging
