@@ -2,6 +2,8 @@ package aurestrecorder
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
@@ -58,7 +60,7 @@ func (c *RecorderImpl) Perform(ctx context.Context, method string, requestUrl st
 				Error:          responseErr,
 			}
 
-			jsonRecording, err := json.Marshal(&recording)
+			jsonRecording, err := json.MarshalIndent(&recording, "", "    ")
 			if err == nil {
 				_ = os.WriteFile(c.RecorderPath+filename, jsonRecording, 0644)
 			}
@@ -74,8 +76,10 @@ func ConstructFilename(method string, requestUrl string) (string, error) {
 	}
 
 	m := strings.ToLower(method)
-	p := parsedUrl.EscapedPath()
-	q := parsedUrl.RawQuery
+	p := url.QueryEscape(parsedUrl.EscapedPath())
+	// we have to ensure the filenames don't get too long. git for windows only supports 260 character paths
+	md5sumOverQuery := md5.Sum([]byte(parsedUrl.RawQuery))
+	q := hex.EncodeToString(md5sumOverQuery[:])
 
 	filename := fmt.Sprintf("request_%s_%s_%s.json", m, p, q)
 	return filename, nil

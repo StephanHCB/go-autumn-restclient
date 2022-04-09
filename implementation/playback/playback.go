@@ -6,6 +6,7 @@ import (
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
 	aurestrecorder "github.com/StephanHCB/go-autumn-restclient/implementation/recorder"
 	"os"
+	"strings"
 )
 
 type PlaybackImpl struct {
@@ -16,6 +17,11 @@ type PlaybackImpl struct {
 //
 // Use this in your tests.
 func New(recorderPath string) aurestclientapi.Client {
+	if recorderPath != "" {
+		if !strings.HasSuffix(recorderPath, "/") {
+			recorderPath += "/"
+		}
+	}
 	return &PlaybackImpl{
 		RecorderPath: recorderPath,
 	}
@@ -40,6 +46,16 @@ func (c *PlaybackImpl) Perform(_ context.Context, method string, requestUrl stri
 
 	response.Header = recording.ParsedResponse.Header
 	response.Status = recording.ParsedResponse.Status
-	response.Body = recording.ParsedResponse.Body
+
+	// cannot just assign the body, need to re-parse into the existing pointer - using a json round trip
+	bodyJsonBytes, err := json.Marshal(recording.ParsedResponse.Body)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(bodyJsonBytes, response.Body)
+	if err != nil {
+		return err
+	}
+
 	return recording.Error
 }
