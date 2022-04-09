@@ -77,6 +77,9 @@ func ConstructFilename(method string, requestUrl string) (string, error) {
 
 	m := strings.ToLower(method)
 	p := url.QueryEscape(parsedUrl.EscapedPath())
+	if len(p) > 120 {
+		p = string([]byte(p)[:120])
+	}
 	// we have to ensure the filenames don't get too long. git for windows only supports 260 character paths
 	md5sumOverQuery := md5.Sum([]byte(parsedUrl.RawQuery))
 	q := hex.EncodeToString(md5sumOverQuery[:])

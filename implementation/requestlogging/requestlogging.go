@@ -19,7 +19,7 @@ func New(wrapped aurestclientapi.Client) aurestclientapi.Client {
 }
 
 func (c *RequestLoggingImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
-	aulogging.Logger.Ctx(ctx).Debug().Printf("downstream %s (%s)...", method, requestUrl)
+	aulogging.Logger.Ctx(ctx).Debug().Printf("downstream %s %s...", method, requestUrl)
 	before := time.Now()
 	err := c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
 	millis := time.Now().Sub(before).Milliseconds()

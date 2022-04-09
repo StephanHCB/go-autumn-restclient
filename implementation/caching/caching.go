@@ -71,11 +71,11 @@ func (c *CachingImpl) Perform(ctx context.Context, method string, requestUrl str
 					response.Status = cachedResponse.ResponseStatus
 					if err == nil && err2 == nil {
 						// cache successfully used
-						aulogging.Logger.Ctx(ctx).Info().Printf("downstream %s (%s) -> %d cached %d seconds ago", method, requestUrl, response.Status, age.Milliseconds()/1000)
+						aulogging.Logger.Ctx(ctx).Info().Printf("downstream %s %s -> %d cached %d seconds ago", method, requestUrl, response.Status, age.Milliseconds()/1000)
 						return nil
 					} else {
 						// invalid cache entry -- delete
-						aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s (%s) -> %d cache FAIL, see error -- deleting cache entry", method, requestUrl, response.Status)
+						aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s %s -> %d cache FAIL, see error -- deleting cache entry", method, requestUrl, response.Status)
 						c.Cache.Delete(key)
 					}
 				} else {
