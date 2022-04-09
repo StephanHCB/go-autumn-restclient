@@ -25,12 +25,12 @@ func (c *RequestLoggingImpl) Perform(ctx context.Context, method string, request
 	millis := time.Now().Sub(before).Milliseconds()
 	if err != nil {
 		if aurestnontripping.Is(err) {
-			aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s (%s) -> %d FAILED (%d ms) (nontripping)", method, requestUrl, response.Status, millis)
+			aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s %s -> %d FAILED (%d ms) (nontripping)", method, requestUrl, response.Status, millis)
 		} else {
-			aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s (%s) -> %d FAILED (%d ms)", method, requestUrl, response.Status, millis)
+			aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s %s -> %d FAILED (%d ms)", method, requestUrl, response.Status, millis)
 		}
 	} else {
-		aulogging.Logger.Ctx(ctx).Info().Printf("downstream %s (%s) -> %d OK (%d ms)", method, requestUrl, response.Status, millis)
+		aulogging.Logger.Ctx(ctx).Info().Printf("downstream %s %s -> %d OK (%d ms)", method, requestUrl, response.Status, millis)
 	}
 	return err
 }
