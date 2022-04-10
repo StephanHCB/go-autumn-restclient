@@ -3,6 +3,7 @@ package aurestclientapi
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 var ContentTypeApplicationJson = "application/json"
@@ -13,6 +14,8 @@ type ParsedResponse struct {
 	Body   interface{}
 	Status int
 	Header http.Header
+	// Time is set to the time the request was made. Even when it comes from cache, it will be set to the original time.
+	Time time.Time
 }
 
 // Client is a utility class representing a http client.

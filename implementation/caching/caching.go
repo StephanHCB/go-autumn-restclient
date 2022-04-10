@@ -18,6 +18,8 @@ type CachingImpl struct {
 	CacheKeyFunction              aurestclientapi.CacheKeyFunction
 	RetentionTime                 time.Duration
 	Cache                         *tinylru.LRU
+	// Now is exposed so tests can fixate the time by overwriting this field
+	Now func() time.Time
 }
 
 type CacheEntry struct {
@@ -49,6 +51,7 @@ func New(
 		CacheKeyFunction:              cacheKeyFunction,
 		RetentionTime:                 retentionTime,
 		Cache:                         cache,
+		Now:                           time.Now,
 	}
 }
 
@@ -64,11 +67,12 @@ func (c *CachingImpl) Perform(ctx context.Context, method string, requestUrl str
 		if ok {
 			cachedResponse, ok := cachedResponseRaw.(CacheEntry)
 			if ok {
-				age := time.Now().Sub(cachedResponse.Recorded)
+				age := c.Now().Sub(cachedResponse.Recorded)
 				if age < c.RetentionTime {
 					err := json.Unmarshal(cachedResponse.ResponseBodyJson, response.Body)
 					err2 := json.Unmarshal(cachedResponse.ResponseHeaderJson, &response.Header)
 					response.Status = cachedResponse.ResponseStatus
+					response.Time = cachedResponse.Recorded
 					if err == nil && err2 == nil {
 						// cache successfully used
 						aulogging.Logger.Ctx(ctx).Info().Printf("downstream %s %s -> %d cached %d seconds ago", method, requestUrl, response.Status, age.Milliseconds()/1000)
@@ -90,7 +94,7 @@ func (c *CachingImpl) Perform(ctx context.Context, method string, requestUrl str
 			status := response.Status
 			if err == nil && err2 == nil {
 				_, _ = c.Cache.Set(key, CacheEntry{
-					Recorded:           time.Now(),
+					Recorded:           response.Time,
 					ResponseBodyJson:   bodyJson,
 					ResponseHeaderJson: headerJson,
 					ResponseStatus:     status,

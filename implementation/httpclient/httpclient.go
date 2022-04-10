@@ -21,6 +21,8 @@ type HttpClientImpl struct {
 	HttpClient         *http.Client
 	RequestManipulator aurestclientapi.RequestManipulatorCallback
 	Timeout            time.Duration
+	// Now is exposed so tests can fixate the time by overwriting this field
+	Now func() time.Time
 }
 
 // New builds a new http client.
@@ -48,6 +50,7 @@ func New(timeout time.Duration, customCACert []byte, requestManipulator aurestcl
 				Timeout:   timeout,
 			},
 			RequestManipulator: requestManipulator,
+			Now:                time.Now,
 		}, nil
 	} else {
 		return &HttpClientImpl{
@@ -55,6 +58,7 @@ func New(timeout time.Duration, customCACert []byte, requestManipulator aurestcl
 				Timeout: timeout,
 			},
 			RequestManipulator: requestManipulator,
+			Now:                time.Now,
 		}, nil
 	}
 }
@@ -77,6 +81,8 @@ func (c *HttpClientImpl) Perform(ctx context.Context, method string, requestUrl 
 	if c.RequestManipulator != nil {
 		c.RequestManipulator(ctx, req)
 	}
+
+	response.Time = c.Now()
 
 	responseInternal, err := c.HttpClient.Do(req)
 	if err != nil {

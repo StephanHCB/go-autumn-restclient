@@ -188,3 +188,42 @@ func TestCacheDeletion(t *testing.T) {
 	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
 	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestcapture.GetRecording(mock))
 }
+
+func TestCacheDeletionCorruptJson(t *testing.T) {
+	aulogging.SetupNoLoggerForTesting()
+
+	mock := tstMock()
+	cut := tstCut(mock)
+
+	aurestcapture.ResetRecording(mock)
+	response := &aurestclientapi.ParsedResponse{
+		Body: &[]string{},
+	}
+	err := cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
+	require.Nil(t, err)
+	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
+	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestcapture.GetRecording(mock))
+
+	// now let's manipulate the cache so the json is syntactically invalid
+	cache := cut.(*CachingImpl).Cache
+	key := defaultKeyFunction(nil, "GET", "http://cache-me", nil)
+	entryRaw, ok := cache.Get(key)
+	require.True(t, ok)
+	entry := entryRaw.(CacheEntry)
+	entry.ResponseBodyJson = []byte("not a valid json")
+	cache.Set(key, entry)
+
+	// now try a second time. Since the cache entry is invalid json, parsing it will fail and the request
+	// will go out despite the cache entry
+	aurestcapture.ResetRecording(mock)
+	response = &aurestclientapi.ParsedResponse{
+		Body: &[]string{},
+	}
+	err = cut.Perform(context.Background(), "GET", "http://cache-me", nil, response)
+	require.Nil(t, err)
+	require.Equal(t, "&[first second]", fmt.Sprintf("%v", response.Body))
+	require.Equal(t, []string{"GET http://cache-me <nil>"}, aurestcapture.GetRecording(mock))
+
+	// and the entry should have been removed from the cache (but we can't test this because it will just
+	// have been added again)
+}

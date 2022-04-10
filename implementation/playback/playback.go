@@ -7,10 +7,13 @@ import (
 	aurestrecorder "github.com/StephanHCB/go-autumn-restclient/implementation/recorder"
 	"os"
 	"strings"
+	"time"
 )
 
 type PlaybackImpl struct {
 	RecorderPath string
+	// Now is exposed so tests can fixate the time by overwriting this field
+	Now func() time.Time
 }
 
 // New builds a new http client simulator based on playback.
@@ -24,6 +27,7 @@ func New(recorderPath string) aurestclientapi.Client {
 	}
 	return &PlaybackImpl{
 		RecorderPath: recorderPath,
+		Now:          time.Now,
 	}
 }
 
@@ -46,6 +50,7 @@ func (c *PlaybackImpl) Perform(_ context.Context, method string, requestUrl stri
 
 	response.Header = recording.ParsedResponse.Header
 	response.Status = recording.ParsedResponse.Status
+	response.Time = c.Now()
 
 	// cannot just assign the body, need to re-parse into the existing pointer - using a json round trip
 	bodyJsonBytes, err := json.Marshal(recording.ParsedResponse.Body)
