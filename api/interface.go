@@ -96,3 +96,12 @@ type CacheResponseConditionCallback func(ctx context.Context, method string, url
 // You must return a unique string that is used as the cache key. If two requests map to the same key, you will get
 // weird behaviour.
 type CacheKeyFunction func(ctx context.Context, method string, url string, requestBody interface{}) string
+
+// MetricsCallbackFunction allows you to instrument the http client stack with callbacks in a variety of
+// places. Designed for metrics collection, but of course you can use it for lots of other stuff.
+//
+// Argument of various Instrument() calls. May always be nil.
+//
+// Not all parameters will always be set. For example, the latency is only known at the request logging level,
+// and the request/response body size is only known while that is being processed.
+type MetricsCallbackFunction func(ctx context.Context, method string, url string, status int, err error, latency time.Duration, size int)

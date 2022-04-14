@@ -18,6 +18,11 @@ type CachingImpl struct {
 	CacheKeyFunction              aurestclientapi.CacheKeyFunction
 	RetentionTime                 time.Duration
 	Cache                         *tinylru.LRU
+
+	CacheHitMetricsCallback     aurestclientapi.MetricsCallbackFunction
+	CacheMissMetricsCallback    aurestclientapi.MetricsCallbackFunction
+	CacheInvalidMetricsCallback aurestclientapi.MetricsCallbackFunction
+
 	// Now is exposed so tests can fixate the time by overwriting this field
 	Now func() time.Time
 }
@@ -52,7 +57,39 @@ func New(
 		RetentionTime:                 retentionTime,
 		Cache:                         cache,
 		Now:                           time.Now,
+		CacheHitMetricsCallback:       doNothingMetricsCallback,
+		CacheMissMetricsCallback:      doNothingMetricsCallback,
+		CacheInvalidMetricsCallback:   doNothingMetricsCallback,
 	}
+}
+
+// Instrument adds instrumentation to a http client.
+//
+// Either of the callbacks may be nil.
+func Instrument(
+	client aurestclientapi.Client,
+	cacheHitMetricsCallback aurestclientapi.MetricsCallbackFunction,
+	cacheMissMetricsCallback aurestclientapi.MetricsCallbackFunction,
+	cacheInvalidMetricsCallback aurestclientapi.MetricsCallbackFunction,
+) {
+	cachingClient, ok := client.(*CachingImpl)
+	if !ok {
+		return
+	}
+
+	if cacheHitMetricsCallback != nil {
+		cachingClient.CacheHitMetricsCallback = cacheHitMetricsCallback
+	}
+	if cacheMissMetricsCallback != nil {
+		cachingClient.CacheMissMetricsCallback = cacheMissMetricsCallback
+	}
+	if cacheInvalidMetricsCallback != nil {
+		cachingClient.CacheInvalidMetricsCallback = cacheInvalidMetricsCallback
+	}
+}
+
+func doNothingMetricsCallback(_ context.Context, _ string, _ string, _ int, _ error, _ time.Duration, _ int) {
+
 }
 
 func defaultKeyFunction(_ context.Context, method string, requestUrl string, _ interface{}) string {
@@ -75,17 +112,29 @@ func (c *CachingImpl) Perform(ctx context.Context, method string, requestUrl str
 					response.Time = cachedResponse.Recorded
 					if err == nil && err2 == nil {
 						// cache successfully used
+						c.CacheHitMetricsCallback(ctx, method, requestUrl, response.Status, nil, 0, len(cachedResponse.ResponseBodyJson))
 						aulogging.Logger.Ctx(ctx).Info().Printf("downstream %s %s -> %d cached %d seconds ago", method, requestUrl, response.Status, age.Milliseconds()/1000)
 						return nil
 					} else {
 						// invalid cache entry -- delete
+						c.CacheInvalidMetricsCallback(ctx, method, requestUrl, 0, err, 0, 0)
 						aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("downstream %s %s -> %d cache FAIL, see error -- deleting cache entry", method, requestUrl, response.Status)
 						c.Cache.Delete(key)
 					}
 				} else {
+					// cache miss - entry there but too old
+					c.CacheMissMetricsCallback(ctx, method, requestUrl, 0, nil, 0, 0)
 					c.Cache.Delete(key)
 				}
+			} else {
+				// invalid cache entry -- delete
+				c.CacheInvalidMetricsCallback(ctx, method, requestUrl, 0, nil, 0, 0)
+				aulogging.Logger.Ctx(ctx).Error().Printf("downstream %s %s -> %d cache FAIL, invalid type -- deleting cache entry", method, requestUrl, response.Status)
+				c.Cache.Delete(key)
 			}
+		} else {
+			// cache miss
+			c.CacheMissMetricsCallback(ctx, method, requestUrl, 0, nil, 0, 0)
 		}
 		err := c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
 		if err == nil && canCache && c.StoreResponseInCacheCondition(ctx, method, requestUrl, requestBody, response) {

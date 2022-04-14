@@ -21,6 +21,10 @@ type HttpClientImpl struct {
 	HttpClient         *http.Client
 	RequestManipulator aurestclientapi.RequestManipulatorCallback
 	Timeout            time.Duration
+
+	RequestMetricsCallback  aurestclientapi.MetricsCallbackFunction
+	ResponseMetricsCallback aurestclientapi.MetricsCallbackFunction
+
 	// Now is exposed so tests can fixate the time by overwriting this field
 	Now func() time.Time
 }
@@ -49,28 +53,59 @@ func New(timeout time.Duration, customCACert []byte, requestManipulator aurestcl
 				Transport: transport,
 				Timeout:   timeout,
 			},
-			RequestManipulator: requestManipulator,
-			Now:                time.Now,
+			RequestManipulator:      requestManipulator,
+			Now:                     time.Now,
+			RequestMetricsCallback:  doNothingMetricsCallback,
+			ResponseMetricsCallback: doNothingMetricsCallback,
 		}, nil
 	} else {
 		return &HttpClientImpl{
 			HttpClient: &http.Client{
 				Timeout: timeout,
 			},
-			RequestManipulator: requestManipulator,
-			Now:                time.Now,
+			RequestManipulator:      requestManipulator,
+			Now:                     time.Now,
+			RequestMetricsCallback:  doNothingMetricsCallback,
+			ResponseMetricsCallback: doNothingMetricsCallback,
 		}, nil
 	}
 }
 
+// Instrument adds instrumentation to a http client.
+//
+// Either of the callbacks may be nil.
+func Instrument(
+	client aurestclientapi.Client,
+	requestMetricsCallback aurestclientapi.MetricsCallbackFunction,
+	responseMetricsCallback aurestclientapi.MetricsCallbackFunction,
+) {
+	httpClient, ok := client.(*HttpClientImpl)
+	if !ok {
+		return
+	}
+
+	if requestMetricsCallback != nil {
+		httpClient.RequestMetricsCallback = requestMetricsCallback
+	}
+	if responseMetricsCallback != nil {
+		httpClient.ResponseMetricsCallback = responseMetricsCallback
+	}
+}
+
+func doNothingMetricsCallback(_ context.Context, _ string, _ string, _ int, _ error, _ time.Duration, _ int) {
+
+}
+
 func (c *HttpClientImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
-	requestBodyReader, contentType, err := c.requestBodyReader(requestBody)
+	requestBodyReader, length, contentType, err := c.requestBodyReader(requestBody)
 	if err != nil {
+		c.RequestMetricsCallback(ctx, method, requestUrl, 0, err, 0, length)
 		return aurestnontripping.New(ctx, err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, requestUrl, requestBodyReader)
 	if err != nil {
+		c.RequestMetricsCallback(ctx, method, requestUrl, 0, err, 0, length)
 		return aurestnontripping.New(ctx, err)
 	}
 
@@ -81,6 +116,8 @@ func (c *HttpClientImpl) Perform(ctx context.Context, method string, requestUrl 
 	if c.RequestManipulator != nil {
 		c.RequestManipulator(ctx, req)
 	}
+
+	c.RequestMetricsCallback(ctx, method, requestUrl, 0, nil, 0, length)
 
 	response.Time = c.Now()
 
@@ -100,38 +137,45 @@ func (c *HttpClientImpl) Perform(ctx context.Context, method string, requestUrl 
 	responseBody, err := ioutil.ReadAll(responseInternal.Body)
 	if err != nil {
 		_ = responseInternal.Body.Close()
+		c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, err, c.Now().Sub(response.Time), 0)
 		return err
 	}
 
 	err = responseInternal.Body.Close()
 	if err != nil {
+		c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, err, c.Now().Sub(response.Time), 0)
 		return err
 	}
 
 	if len(responseBody) > 0 && response.Body != nil {
 		err := json.Unmarshal(responseBody, response.Body)
 		if err != nil {
+			c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, err, c.Now().Sub(response.Time), len(responseBody))
 			return aurestnontripping.New(ctx, err)
 		}
+		c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, nil, c.Now().Sub(response.Time), len(responseBody))
+	} else {
+		c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, nil, c.Now().Sub(response.Time), 0)
 	}
 
 	return nil
 }
 
-func (c *HttpClientImpl) requestBodyReader(requestBody interface{}) (io.Reader, string, error) {
+func (c *HttpClientImpl) requestBodyReader(requestBody interface{}) (io.Reader, int, string, error) {
 	if requestBody == nil {
-		return nil, "", nil
+		return nil, 0, "", nil
 	}
 	if asString, ok := requestBody.(string); ok {
-		return strings.NewReader(asString), aurestclientapi.ContentTypeApplicationJson, nil
+		return strings.NewReader(asString), len(asString), aurestclientapi.ContentTypeApplicationJson, nil
 	}
 	if asUrlValues, ok := requestBody.(url.Values); ok {
-		return strings.NewReader(asUrlValues.Encode()), aurestclientapi.ContentTypeApplicationXWwwFormUrlencoded, nil
+		asString := asUrlValues.Encode()
+		return strings.NewReader(asString), len(asString), aurestclientapi.ContentTypeApplicationXWwwFormUrlencoded, nil
 	}
 
 	marshalled, err := json.Marshal(requestBody)
 	if err != nil {
-		return nil, "", err
+		return nil, 0, "", err
 	}
-	return strings.NewReader(string(marshalled)), aurestclientapi.ContentTypeApplicationJson, nil
+	return strings.NewReader(string(marshalled)), len(marshalled), aurestclientapi.ContentTypeApplicationJson, nil
 }
