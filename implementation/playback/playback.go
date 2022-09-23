@@ -3,6 +3,7 @@ package aurestplayback
 import (
 	"context"
 	"encoding/json"
+	aulogging "github.com/StephanHCB/go-autumn-logging"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
 	aurestrecorder "github.com/StephanHCB/go-autumn-restclient/implementation/recorder"
 	"os"
@@ -31,15 +32,26 @@ func New(recorderPath string) aurestclientapi.Client {
 	}
 }
 
-func (c *PlaybackImpl) Perform(_ context.Context, method string, requestUrl string, _ interface{}, response *aurestclientapi.ParsedResponse) error {
-	filename, err := aurestrecorder.ConstructFilename(method, requestUrl)
+func (c *PlaybackImpl) Perform(ctx context.Context, method string, requestUrl string, _ interface{}, response *aurestclientapi.ParsedResponse) error {
+	filename, err := aurestrecorder.ConstructFilenameV2(method, requestUrl)
 	if err != nil {
 		return err
 	}
 
 	jsonBytes, err := os.ReadFile(c.RecorderPath + filename)
 	if err != nil {
-		return err
+		// try old filename for compatibility (cannot fail if ConstructFilenameV2 didn't)
+		filenameOld, _ := aurestrecorder.ConstructFilename(method, requestUrl)
+
+		jsonBytesOld, errWithOldFilename := os.ReadFile(c.RecorderPath + filenameOld)
+		if errWithOldFilename != nil {
+			// but return original error if that also fails
+			return err
+		} else {
+			aulogging.Logger.Ctx(ctx).Info().Printf("use of deprecated recorder filename '%s', please move to '%s'", filenameOld, filename)
+			filename = filenameOld
+			jsonBytes = jsonBytesOld
+		}
 	}
 
 	recording := aurestrecorder.RecorderData{}

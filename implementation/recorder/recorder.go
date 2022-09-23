@@ -50,7 +50,7 @@ type RecorderData struct {
 func (c *RecorderImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
 	responseErr := c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
 	if c.RecorderPath != "" {
-		filename, err := ConstructFilename(method, requestUrl)
+		filename, err := ConstructFilenameV2(method, requestUrl)
 		if err == nil {
 			recording := RecorderData{
 				Method:         method,
@@ -83,6 +83,30 @@ func ConstructFilename(method string, requestUrl string) (string, error) {
 	// we have to ensure the filenames don't get too long. git for windows only supports 260 character paths
 	md5sumOverQuery := md5.Sum([]byte(parsedUrl.RawQuery))
 	q := hex.EncodeToString(md5sumOverQuery[:])
+
+	filename := fmt.Sprintf("request_%s_%s_%s.json", m, p, q)
+	return filename, nil
+}
+
+func ConstructFilenameV2(method string, requestUrl string) (string, error) {
+	parsedUrl, err := url.Parse(requestUrl)
+	if err != nil {
+		return "", err
+	}
+
+	m := strings.ToLower(method)
+	p := url.QueryEscape(parsedUrl.EscapedPath())
+	if len(p) > 120 {
+		p = string([]byte(p)[:120])
+	}
+	p = strings.ReplaceAll(p, "%2F", "-")
+	p = strings.TrimLeft(p, "-")
+	p = strings.TrimRight(p, "-")
+
+	// we have to ensure the filenames don't get too long. git for windows only supports 260 character paths
+	md5sumOverQuery := md5.Sum([]byte(parsedUrl.RawQuery))
+	q := hex.EncodeToString(md5sumOverQuery[:])
+	q = q[:8]
 
 	filename := fmt.Sprintf("request_%s_%s_%s.json", m, p, q)
 	return filename, nil
