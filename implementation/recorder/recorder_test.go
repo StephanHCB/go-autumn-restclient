@@ -20,3 +20,19 @@ func TestConstructFilenameShort(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, expected, actual)
 }
+
+func TestConstructFilenameV2Long(t *testing.T) {
+	requestUrl := "https://some.super.long.server.name.that.hopefully.does.not.exist/api/rest/v1/v2/v3/v4/this/is/intentionally/very/very/very/very/long/djkfjhdalsfhdsahjflkdjsahfkjlsdhafjkdshafkjlsdahf/asdfjkldsahfkjlfad/dskjfhjkdsfahlk/sdafjkhsdafklhreuih/dfgjgkjlhgjlkhg?asjdfhlkhewuirfhkjsdhlk=kjhrelrukihsjd&fsdkjhfdjklhsdf=werjkyewuiryuweiry&sfuyfddsjkhjkldsfhldkfs=sdjhdflksjhfdhsf"
+	actual, err := ConstructFilenameV2("GET", requestUrl)
+	expected := "request_get_api-rest-v1-v2-v3-v4-this-is-intentionally-very-very-very-very-long-djkfjhdalsfhdsahjflkd_fb2e3656.json"
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
+}
+
+func TestConstructFilenameV2Short(t *testing.T) {
+	requestUrl := "https://some.short.server.name/api/rest/v1/kittens"
+	actual, err := ConstructFilenameV2("GET", requestUrl)
+	expected := "request_get_api-rest-v1-kittens_d41d8cd9.json"
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
+}
