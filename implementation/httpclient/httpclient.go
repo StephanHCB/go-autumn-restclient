@@ -148,10 +148,15 @@ func (c *HttpClientImpl) Perform(ctx context.Context, method string, requestUrl 
 	}
 
 	if len(responseBody) > 0 && response.Body != nil {
-		err := json.Unmarshal(responseBody, response.Body)
-		if err != nil {
-			c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, err, c.Now().Sub(response.Time), len(responseBody))
-			return aurestnontripping.New(ctx, err)
+		switch response.Body.(type) {
+		case **[]byte:
+			*(response.Body.(**[]byte)) = &responseBody
+		default:
+			err := json.Unmarshal(responseBody, response.Body)
+			if err != nil {
+				c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, err, c.Now().Sub(response.Time), len(responseBody))
+				return aurestnontripping.New(ctx, err)
+			}
 		}
 		c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, nil, c.Now().Sub(response.Time), len(responseBody))
 	} else {
