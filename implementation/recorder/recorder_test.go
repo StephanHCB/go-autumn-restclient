@@ -36,3 +36,29 @@ func TestConstructFilenameV2Short(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, expected, actual)
 }
+
+func TestConstructFilenameV3Long(t *testing.T) {
+	requestUrl := "https://some.super.long.server.name.that.hopefully.does.not.exist/api/rest/v1/v2/v3/v4/this/is/intentionally/very/very/very/very/long/djkfjhdalsfhdsahjflkdjsahfkjlsdhafjkdshafkjlsdahf/asdfjkldsahfkjlfad/dskjfhjkdsfahlk/sdafjkhsdafklhreuih/dfgjgkjlhgjlkhg?asjdfhlkhewuirfhkjsdhlk=kjhrelrukihsjd&fsdkjhfdjklhsdf=werjkyewuiryuweiry&sfuyfddsjkhjkldsfhldkfs=sdjhdflksjhfdhsf"
+	actual, err := ConstructFilenameV3("GET", requestUrl)
+	expected := "request_get_api-rest-v1-v2-v3-v4-this-is-intentionally-very-very-very-very-long-djkfjhdalsfhdsahjflkd_fb2e3656.json"
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
+}
+
+func TestConstructFilenameV3Short(t *testing.T) {
+	requestUrl := "https://some.short.server.name/api/rest/v1/kittens"
+	actual, err := ConstructFilenameV3("GET", requestUrl)
+	expected := "request_get_api-rest-v1-kittens_d41d8cd9.json"
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
+}
+
+func TestConstructEqualFilenameV3ForDifferentQueryParameterOrder(t *testing.T) {
+	requestUrl1 := "https://some.short.server.name/api/rest/v1/kittens?a=123&z=o&v=666"
+	actual1, _ := ConstructFilenameV3("GET", requestUrl1)
+
+	requestUrl2 := "https://some.short.server.name/api/rest/v1/kittens?z=o&v=666&a=123"
+	actual2, _ := ConstructFilenameV3("GET", requestUrl2)
+
+	require.Equal(t, actual1, actual2)
+}
