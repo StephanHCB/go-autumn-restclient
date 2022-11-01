@@ -33,7 +33,7 @@ func New(recorderPath string) aurestclientapi.Client {
 }
 
 func (c *PlaybackImpl) Perform(ctx context.Context, method string, requestUrl string, _ interface{}, response *aurestclientapi.ParsedResponse) error {
-	filename, err := aurestrecorder.ConstructFilenameV2(method, requestUrl)
+	filename, err := aurestrecorder.ConstructFilenameV3(method, requestUrl)
 	if err != nil {
 		return err
 	}
@@ -41,16 +41,26 @@ func (c *PlaybackImpl) Perform(ctx context.Context, method string, requestUrl st
 	jsonBytes, err := os.ReadFile(c.RecorderPath + filename)
 	if err != nil {
 		// try old filename for compatibility (cannot fail if ConstructFilenameV2 didn't)
-		filenameOld, _ := aurestrecorder.ConstructFilename(method, requestUrl)
+		filenameOldV1, _ := aurestrecorder.ConstructFilename(method, requestUrl)
 
-		jsonBytesOld, errWithOldFilename := os.ReadFile(c.RecorderPath + filenameOld)
-		if errWithOldFilename != nil {
-			// but return original error if that also fails
-			return err
+		jsonBytesOldV1, errWithOldFilenameV1 := os.ReadFile(c.RecorderPath + filenameOldV1)
+		if errWithOldFilenameV1 != nil {
+			// try old filename for compatibility (cannot fail if ConstructFilenameV2 didn't)
+			filenameOldV2, _ := aurestrecorder.ConstructFilenameV2(method, requestUrl)
+
+			jsonBytesOldV2, errWithOldFilenameV2 := os.ReadFile(c.RecorderPath + filenameOldV2)
+			if errWithOldFilenameV2 != nil {
+				// but return original error if that also fails
+				return err
+			} else {
+				aulogging.Logger.Ctx(ctx).Info().Printf("use of deprecated recorder filename (v2) '%s', please move to '%s'", filenameOldV2, filename)
+				filename = filenameOldV2
+				jsonBytes = jsonBytesOldV2
+			}
 		} else {
-			aulogging.Logger.Ctx(ctx).Info().Printf("use of deprecated recorder filename '%s', please move to '%s'", filenameOld, filename)
-			filename = filenameOld
-			jsonBytes = jsonBytesOld
+			aulogging.Logger.Ctx(ctx).Info().Printf("use of deprecated recorder filename (v1) '%s', please move to '%s'", filenameOldV1, filename)
+			filename = filenameOldV1
+			jsonBytes = jsonBytesOldV1
 		}
 	}
 
