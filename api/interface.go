@@ -2,6 +2,7 @@ package aurestclientapi
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"time"
 )
@@ -16,6 +17,14 @@ type ParsedResponse struct {
 	Header http.Header
 	// Time is set to the time the request was made. Even when it comes from cache, it will be set to the original time.
 	Time time.Time
+}
+
+// CustomRequestBody allows you the greatest amount of control over the request by directly supplying the
+// body io.Reader, the length, and the content type header.
+type CustomRequestBody struct {
+	BodyReader  io.Reader // Tip: &bytes.Buffer{} implements io.Reader
+	BodyLength  int
+	ContentType string
 }
 
 // Client is a utility class representing a http client.
