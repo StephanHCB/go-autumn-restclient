@@ -170,6 +170,9 @@ func (c *HttpClientImpl) requestBodyReader(requestBody interface{}) (io.Reader, 
 	if requestBody == nil {
 		return nil, 0, "", nil
 	}
+	if asCustom, ok := requestBody.(aurestclientapi.CustomRequestBody); ok {
+		return asCustom.BodyReader, asCustom.BodyLength, asCustom.ContentType, nil
+	}
 	if asString, ok := requestBody.(string); ok {
 		return strings.NewReader(asString), len(asString), aurestclientapi.ContentTypeApplicationJson, nil
 	}
