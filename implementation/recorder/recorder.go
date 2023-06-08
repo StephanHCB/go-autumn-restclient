@@ -12,12 +12,19 @@ import (
 	"strings"
 )
 
+type ConstructFilenameFunction func(method string, requestUrl string, requestBody interface{}) (string, error)
+
 type RecorderImpl struct {
-	Wrapped      aurestclientapi.Client
-	RecorderPath string
+	Wrapped               aurestclientapi.Client
+	RecorderPath          string
+	ConstructFilenameFunc ConstructFilenameFunction
 }
 
 const RecorderPathEnvVariable = "GO_AUTUMN_RESTCLIENT_RECORDER_PATH"
+
+type RecorderOptions struct {
+	ConstructFilenameFunc ConstructFilenameFunction
+}
 
 // New builds a new http recorder.
 //
@@ -26,16 +33,25 @@ const RecorderPathEnvVariable = "GO_AUTUMN_RESTCLIENT_RECORDER_PATH"
 // Normally it does nothing, but if you set the environment variable RecorderPathEnvVariable to a path to a directory,
 // it will write response recordings for your requests that you can then play back using aurestplayback.PlaybackImpl
 // in your tests.
-func New(wrapped aurestclientapi.Client) aurestclientapi.Client {
+//
+// You can optionally add a RecorderOptions instance to your call. The ... is really just so it's an optional argument.
+func New(wrapped aurestclientapi.Client, additionalOptions ...RecorderOptions) aurestclientapi.Client {
 	recorderPath := os.Getenv(RecorderPathEnvVariable)
 	if recorderPath != "" {
 		if !strings.HasSuffix(recorderPath, "/") {
 			recorderPath += "/"
 		}
 	}
+	filenameFunc := ConstructFilenameV3WithBody
+	for _, o := range additionalOptions {
+		if o.ConstructFilenameFunc != nil {
+			filenameFunc = o.ConstructFilenameFunc
+		}
+	}
 	return &RecorderImpl{
-		Wrapped:      wrapped,
-		RecorderPath: recorderPath,
+		Wrapped:               wrapped,
+		RecorderPath:          recorderPath,
+		ConstructFilenameFunc: filenameFunc,
 	}
 }
 
@@ -50,7 +66,7 @@ type RecorderData struct {
 func (c *RecorderImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
 	responseErr := c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
 	if c.RecorderPath != "" {
-		filename, err := ConstructFilenameV3(method, requestUrl)
+		filename, err := c.ConstructFilenameFunc(method, requestUrl, requestBody)
 		if err == nil {
 			recording := RecorderData{
 				Method:         method,
@@ -88,6 +104,10 @@ func ConstructFilename(method string, requestUrl string) (string, error) {
 	return filename, nil
 }
 
+func ConstructFilenameWithBody(method string, requestUrl string, _ interface{}) (string, error) {
+	return ConstructFilename(method, requestUrl)
+}
+
 func ConstructFilenameV2(method string, requestUrl string) (string, error) {
 	parsedUrl, err := url.Parse(requestUrl)
 	if err != nil {
@@ -112,6 +132,10 @@ func ConstructFilenameV2(method string, requestUrl string) (string, error) {
 	return filename, nil
 }
 
+func ConstructFilenameV2WithBody(method string, requestUrl string, _ interface{}) (string, error) {
+	return ConstructFilenameV2(method, requestUrl)
+}
+
 func ConstructFilenameV3(method string, requestUrl string) (string, error) {
 	parsedUrl, err := url.Parse(requestUrl)
 	if err != nil {
@@ -134,4 +158,8 @@ func ConstructFilenameV3(method string, requestUrl string) (string, error) {
 
 	filename := fmt.Sprintf("request_%s_%s_%s.json", m, p, q)
 	return filename, nil
+}
+
+func ConstructFilenameV3WithBody(method string, requestUrl string, _ interface{}) (string, error) {
+	return ConstructFilenameV3(method, requestUrl)
 }
