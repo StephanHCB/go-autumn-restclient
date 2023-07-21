@@ -113,9 +113,27 @@ func (c *VerifierImpl) Perform(ctx context.Context, method string, requestUrl st
 	response.Status = mockResponse.Status
 	response.Time = mockResponse.Time
 	if response.Body != nil && mockResponse.Body != nil {
-		// copy over through json round trip
-		marshalled, _ := json.Marshal(mockResponse.Body)
-		_ = json.Unmarshal(marshalled, response.Body)
+		switch response.Body.(type) {
+		case **[]byte:
+			if asString, ok := mockResponse.Body.(string); ok {
+				// allow strings containing anything
+				asBytes := []byte(asString)
+				*(response.Body.(**[]byte)) = &asBytes
+			} else {
+				// if given a structure, marshal to json and return that
+				marshalled, _ := json.Marshal(mockResponse.Body)
+				*(response.Body.(**[]byte)) = &marshalled
+			}
+		default:
+			if asString, ok := mockResponse.Body.(string); ok {
+				// allow strings containing a json doc
+				_ = json.Unmarshal([]byte(asString), response.Body)
+			} else {
+				// copy over through json round trip
+				marshalled, _ := json.Marshal(mockResponse.Body)
+				_ = json.Unmarshal(marshalled, response.Body)
+			}
+		}
 	}
 
 	return nil
