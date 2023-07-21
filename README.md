@@ -109,6 +109,13 @@ Useful for unit testing.
     mockClient := aurestmock.New(mockResponses, mockErrors)
 ```
 
+#### 1c. Or use verifier (super-basic consumer interaction testing)
+
+This mock client doesn't make actual requests, but instead you set up a list of
+expected interactions.
+
+This allows doing very simple consumer tests, useful mostly for their documentation value.
+
 #### 2. Response recording
 
 If your tests use Option 1a (playback), you should insert a response recorder in your production stack.
