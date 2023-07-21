@@ -7,7 +7,10 @@ import (
 	"fmt"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
 	"io"
+	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 )
 
 type VerifierImpl struct {
@@ -18,6 +21,7 @@ type VerifierImpl struct {
 type Request struct {
 	Name   string // key for the request
 	Method string
+	Header http.Header // currently not tested, just supplied as documentation for now
 	Url    string
 	Body   interface{}
 }
@@ -68,6 +72,24 @@ func requestBodyAsString(requestBody interface{}) string {
 	return string(marshalled)
 }
 
+func headersSortedAsString(spec http.Header) string {
+	var result strings.Builder
+
+	sortedKeys := make([]string, 0)
+	for k, _ := range spec {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	for _, k := range sortedKeys {
+		result.WriteString(fmt.Sprintf("%s: ", k))
+		for _, v := range spec[k] {
+			result.WriteString(fmt.Sprintf("%s ", v))
+		}
+	}
+	return result.String()
+}
+
 func New() (aurestclientapi.Client, *VerifierImpl) {
 	instance := &VerifierImpl{
 		expectations: make([]Expectation, 0),
@@ -110,6 +132,7 @@ func (c *VerifierImpl) currentExpectation(method string, requestUrl string, requ
 					c.firstUnexpected = &Request{
 						Name:   fmt.Sprintf("unmatched expectation %d - %s", i+1, e.Request.Name),
 						Method: method,
+						Header: nil, // not currently available
 						Url:    requestUrl,
 						Body:   requestBody,
 					}
@@ -123,6 +146,7 @@ func (c *VerifierImpl) currentExpectation(method string, requestUrl string, requ
 		c.firstUnexpected = &Request{
 			Name:   fmt.Sprintf("no expectations remaining - unexpected request at end"),
 			Method: method,
+			Header: nil, // not currently available
 			Url:    requestUrl,
 			Body:   requestBody,
 		}
