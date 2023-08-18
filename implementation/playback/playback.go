@@ -3,12 +3,13 @@ package aurestplayback
 import (
 	"context"
 	"encoding/json"
-	aulogging "github.com/StephanHCB/go-autumn-logging"
-	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
-	aurestrecorder "github.com/StephanHCB/go-autumn-restclient/implementation/recorder"
 	"os"
 	"path/filepath"
 	"time"
+
+	aulogging "github.com/StephanHCB/go-autumn-logging"
+	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
+	aurestrecorder "github.com/StephanHCB/go-autumn-restclient/implementation/recorder"
 )
 
 const PlaybackRewritePathEnvVariable = "GO_AUTUMN_RESTCLIENT_PLAYBACK_REWRITE_PATH"
@@ -97,9 +98,15 @@ func (c *PlaybackImpl) Perform(ctx context.Context, method string, requestUrl st
 			if err != nil {
 				return err
 			}
-			err = json.Unmarshal(bodyJsonBytes, response.Body)
-			if err != nil {
-				return err
+
+			switch response.Body.(type) {
+			case **[]byte:
+				*(response.Body.(**[]byte)) = &bodyJsonBytes
+			default:
+				err = json.Unmarshal(bodyJsonBytes, response.Body)
+				if err != nil {
+					return err
+				}
 			}
 
 			return recording.Error
