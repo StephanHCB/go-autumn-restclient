@@ -93,16 +93,28 @@ func (c *PlaybackImpl) Perform(ctx context.Context, method string, requestUrl st
 			response.Status = recording.ParsedResponse.Status
 			response.Time = c.Now()
 
-			// cannot just assign the body, need to re-parse into the existing pointer - using a json round trip
-			bodyJsonBytes, err := json.Marshal(recording.ParsedResponse.Body)
-			if err != nil {
-				return err
-			}
-
 			switch response.Body.(type) {
 			case **[]byte:
-				*(response.Body.(**[]byte)) = &bodyJsonBytes
+				asString, ok := recording.ParsedResponse.Body.(string)
+				if ok {
+					asBytes := []byte(asString)
+					*(response.Body.(**[]byte)) = &asBytes
+				} else {
+					// For backwards compatibility with existing recordings we fall back to the previous logic.
+					// This is because in these old recordings the body is stored as a json object instead of a string.
+					// This is not compatible with the changes introduced in 0.7.2
+					bodyJsonBytes, err := json.Marshal(recording.ParsedResponse.Body)
+					if err != nil {
+						return err
+					}
+					*(response.Body.(**[]byte)) = &bodyJsonBytes
+				}
 			default:
+				// cannot just assign the body, need to re-parse into the existing pointer - using a json round trip
+				bodyJsonBytes, err := json.Marshal(recording.ParsedResponse.Body)
+				if err != nil {
+					return err
+				}
 				err = json.Unmarshal(bodyJsonBytes, response.Body)
 				if err != nil {
 					return err
