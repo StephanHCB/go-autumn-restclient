@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+type RetryOptions struct {
+	RepeatCount uint8
+
+	BeforeRetryOrNil aurestclientapi.BeforeRetryCallback
+
+	SilenceGivingUp bool
+}
+
 type RetryImpl struct {
 	Wrapped     aurestclientapi.Client
 	RepeatCount uint8
@@ -16,6 +24,28 @@ type RetryImpl struct {
 
 	RetryingMetricsCallback aurestclientapi.MetricsCallbackFunction
 	GivingUpMetricsCallback aurestclientapi.MetricsCallbackFunction
+
+	SilenceGivingUp bool
+}
+
+func NewWithOptions(
+	wrapped aurestclientapi.Client,
+	condition aurestclientapi.RetryConditionCallback,
+	opts RetryOptions,
+) aurestclientapi.Client {
+	repeatCount := uint8(2)
+	if opts.RepeatCount > 0 {
+		repeatCount = opts.RepeatCount
+	}
+	return &RetryImpl{
+		Wrapped:                 wrapped,
+		RepeatCount:             repeatCount,
+		RetryCondition:          condition,
+		BeforeRetry:             opts.BeforeRetryOrNil,
+		RetryingMetricsCallback: doNothingMetricsCallback,
+		GivingUpMetricsCallback: doNothingMetricsCallback,
+		SilenceGivingUp:         opts.SilenceGivingUp,
+	}
 }
 
 func New(
@@ -69,7 +99,9 @@ func (c *RetryImpl) Perform(ctx context.Context, method string, requestUrl strin
 			// (*)
 			if attempt == c.RepeatCount+1 {
 				c.GivingUpMetricsCallback(ctx, method, requestUrl, response.Status, err, 0, 0)
-				aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("giving up on %s %s after attempt %d", method, requestUrl, attempt)
+				if !c.SilenceGivingUp {
+					aulogging.Logger.Ctx(ctx).Warn().WithErr(err).Printf("giving up on %s %s after attempt %d", method, requestUrl, attempt)
+				}
 				return err
 			}
 		} else {
