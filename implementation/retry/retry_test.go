@@ -131,7 +131,7 @@ func TestFailWithRetryWithOpts(t *testing.T) {
 	aulogging.SetupNoLoggerForTesting()
 
 	mock := tstMock()
-	cut := NewWithOpts(mock,
+	cut := NewWithOptions(mock,
 		func(ctx context.Context, response *aurestclientapi.ParsedResponse, err error) bool {
 			return true
 		},

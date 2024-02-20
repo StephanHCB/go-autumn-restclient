@@ -28,23 +28,23 @@ type RetryImpl struct {
 	SilenceGivingUp bool
 }
 
-func NewWithOpts(
+func NewWithOptions(
 	wrapped aurestclientapi.Client,
 	condition aurestclientapi.RetryConditionCallback,
-	options RetryOptions,
+	opts RetryOptions,
 ) aurestclientapi.Client {
 	repeatCount := uint8(2)
-	if options.RepeatCount > 0 {
-		repeatCount = options.RepeatCount
+	if opts.RepeatCount > 0 {
+		repeatCount = opts.RepeatCount
 	}
 	return &RetryImpl{
 		Wrapped:                 wrapped,
 		RepeatCount:             repeatCount,
 		RetryCondition:          condition,
-		BeforeRetry:             options.BeforeRetryOrNil,
+		BeforeRetry:             opts.BeforeRetryOrNil,
 		RetryingMetricsCallback: doNothingMetricsCallback,
 		GivingUpMetricsCallback: doNothingMetricsCallback,
-		SilenceGivingUp:         options.SilenceGivingUp,
+		SilenceGivingUp:         opts.SilenceGivingUp,
 	}
 }
 
