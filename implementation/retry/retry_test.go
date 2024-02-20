@@ -127,6 +127,28 @@ func TestFailWithRetry(t *testing.T) {
 	require.Equal(t, []string{r, r, r, r}, aurestcapture.GetRecording(mock))
 }
 
+func TestFailWithRetryWithOpts(t *testing.T) {
+	aulogging.SetupNoLoggerForTesting()
+
+	mock := tstMock()
+	cut := NewWithOpts(mock,
+		func(ctx context.Context, response *aurestclientapi.ParsedResponse, err error) bool {
+			return true
+		},
+		RetryOptions{
+			BeforeRetryOrNil: nil,
+			SilenceGivingUp:  true,
+		},
+	)
+
+	response := &aurestclientapi.ParsedResponse{}
+	err := cut.Perform(context.Background(), "GET", "http://err", nil, response)
+	require.NotNil(t, err)
+	require.Equal(t, "some transport error", err.Error())
+	r := "GET http://err <nil>"
+	require.Equal(t, []string{r, r, r}, aurestcapture.GetRecording(mock))
+}
+
 func TestAbortRetry(t *testing.T) {
 	aulogging.SetupNoLoggerForTesting()
 
