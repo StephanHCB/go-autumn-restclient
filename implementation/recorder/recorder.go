@@ -36,6 +36,15 @@ type RecorderOptions struct {
 //
 // You can optionally add a RecorderOptions instance to your call. The ... is really just so it's an optional argument.
 func New(wrapped aurestclientapi.Client, additionalOptions ...RecorderOptions) aurestclientapi.Client {
+	recorderPath, filenameFunc := initRecorderPathAndFilenameFunc(additionalOptions)
+	return &RecorderImpl{
+		Wrapped:               wrapped,
+		RecorderPath:          recorderPath,
+		ConstructFilenameFunc: filenameFunc,
+	}
+}
+
+func initRecorderPathAndFilenameFunc(additionalOptions []RecorderOptions) (string, ConstructFilenameFunction) {
 	recorderPath := os.Getenv(RecorderPathEnvVariable)
 	if recorderPath != "" {
 		if !strings.HasSuffix(recorderPath, "/") {
@@ -48,11 +57,7 @@ func New(wrapped aurestclientapi.Client, additionalOptions ...RecorderOptions) a
 			filenameFunc = o.ConstructFilenameFunc
 		}
 	}
-	return &RecorderImpl{
-		Wrapped:               wrapped,
-		RecorderPath:          recorderPath,
-		ConstructFilenameFunc: filenameFunc,
-	}
+	return recorderPath, filenameFunc
 }
 
 type RecorderData struct {
@@ -65,8 +70,16 @@ type RecorderData struct {
 
 func (c *RecorderImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
 	responseErr := c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
-	if c.RecorderPath != "" {
-		filename, err := c.ConstructFilenameFunc(method, requestUrl, requestBody)
+
+	recordResponseData(method, requestUrl, requestBody, response, responseErr, c.RecorderPath, c.ConstructFilenameFunc)
+	return responseErr
+}
+
+func recordResponseData(method string, requestUrl string, requestBody interface{},
+	response *aurestclientapi.ParsedResponse, responseErr error,
+	recorderPath string, constructFilenameFunc ConstructFilenameFunction) {
+	if recorderPath != "" {
+		filename, err := constructFilenameFunc(method, requestUrl, requestBody)
 		if err == nil {
 			recording := RecorderData{
 				Method:         method,
@@ -78,11 +91,10 @@ func (c *RecorderImpl) Perform(ctx context.Context, method string, requestUrl st
 
 			jsonRecording, err := json.MarshalIndent(&recording, "", "    ")
 			if err == nil {
-				_ = os.WriteFile(c.RecorderPath+filename, jsonRecording, 0644)
+				_ = os.WriteFile(recorderPath+filename, jsonRecording, 0644)
 			}
 		}
 	}
-	return responseErr
 }
 
 func ConstructFilename(method string, requestUrl string) (string, error) {

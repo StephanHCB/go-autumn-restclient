@@ -71,18 +71,28 @@ func New(wrapped aurestclientapi.Client) aurestclientapi.Client {
 }
 
 func (c *RequestLoggingImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
-	c.Options.BeforeRequest(ctx).Printf("downstream %s %s...", method, requestUrl)
-	before := time.Now()
+	startTime := logRequest(ctx, method, requestUrl, &c.Options)
+
 	err := c.Wrapped.Perform(ctx, method, requestUrl, requestBody, response)
-	millis := time.Now().Sub(before).Milliseconds()
+
+	logResponse(ctx, method, requestUrl, response.Status, err, startTime, &c.Options)
+	return err
+}
+
+func logRequest(ctx context.Context, method string, requestUrl string, opts *RequestLoggingOptions) time.Time {
+	opts.BeforeRequest(ctx).Printf("downstream %s %s...", method, requestUrl)
+	return time.Now()
+}
+
+func logResponse(ctx context.Context, method string, requestUrl string, responseStatusCode int, err error, startTime time.Time, opts *RequestLoggingOptions) {
+	reqDuration := time.Now().Sub(startTime).Milliseconds()
 	if err != nil {
 		if aurestnontripping.Is(err) {
-			c.Options.Failure(ctx).WithErr(err).Printf("downstream %s %s -> %d FAILED (%d ms) (nontripping)", method, requestUrl, response.Status, millis)
+			opts.Failure(ctx).WithErr(err).Printf("downstream %s %s -> %d FAILED (%d ms) (nontripping)", method, requestUrl, responseStatusCode, reqDuration)
 		} else {
-			c.Options.Failure(ctx).WithErr(err).Printf("downstream %s %s -> %d FAILED (%d ms)", method, requestUrl, response.Status, millis)
+			opts.Failure(ctx).WithErr(err).Printf("downstream %s %s -> %d FAILED (%d ms)", method, requestUrl, responseStatusCode, reqDuration)
 		}
 	} else {
-		c.Options.Success(ctx).Printf("downstream %s %s -> %d OK (%d ms)", method, requestUrl, response.Status, millis)
+		opts.Success(ctx).Printf("downstream %s %s -> %d OK (%d ms)", method, requestUrl, responseStatusCode, reqDuration)
 	}
-	return err
 }

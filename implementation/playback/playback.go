@@ -36,6 +36,17 @@ type PlaybackOptions struct {
 //
 // You can optionally add a PlaybackOptions instance to your call. The ... is really just so it's an optional argument.
 func New(recorderPath string, additionalOptions ...PlaybackOptions) aurestclientapi.Client {
+	recorderRewritePath, filenameCandidates, nowFunc := initRecorderPathAndFilenameFunc(additionalOptions)
+
+	return &PlaybackImpl{
+		RecorderPath:                recorderPath,
+		RecorderRewritePath:         recorderRewritePath,
+		ConstructFilenameCandidates: filenameCandidates,
+		Now:                         nowFunc,
+	}
+}
+
+func initRecorderPathAndFilenameFunc(additionalOptions []PlaybackOptions) (string, []aurestrecorder.ConstructFilenameFunction, func() time.Time) {
 	filenameCandidates := []aurestrecorder.ConstructFilenameFunction{
 		aurestrecorder.ConstructFilenameV3WithBody,
 		aurestrecorder.ConstructFilenameWithBody,
@@ -50,12 +61,8 @@ func New(recorderPath string, additionalOptions ...PlaybackOptions) aurestclient
 			nowFunc = o.NowFunc
 		}
 	}
-	return &PlaybackImpl{
-		RecorderPath:                recorderPath,
-		RecorderRewritePath:         os.Getenv(PlaybackRewritePathEnvVariable),
-		ConstructFilenameCandidates: filenameCandidates,
-		Now:                         nowFunc,
-	}
+	recorderRewritePath := os.Getenv(PlaybackRewritePathEnvVariable)
+	return recorderRewritePath, filenameCandidates, nowFunc
 }
 
 func (c *PlaybackImpl) Perform(ctx context.Context, method string, requestUrl string, requestBody interface{}, response *aurestclientapi.ParsedResponse) error {
