@@ -10,7 +10,6 @@ import (
 	aurestnontripping "github.com/StephanHCB/go-autumn-restclient/implementation/errors/nontrippingerror"
 	"github.com/go-http-utils/headers"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -38,37 +37,32 @@ type HttpClientImpl struct {
 // If len(customCACert) is 0, the default CA certificates are used, but if you specify it, they are excluded to ensure
 // only your certs are accepted.
 func New(timeout time.Duration, customCACert []byte, requestManipulator aurestclientapi.RequestManipulatorCallback) (aurestclientapi.Client, error) {
+	httpTransport := createHttpTransport(customCACert)
+
+	return &HttpClientImpl{
+		HttpClient: &http.Client{
+			Transport: httpTransport,
+			Timeout:   timeout,
+		},
+		RequestManipulator:      requestManipulator,
+		Now:                     time.Now,
+		RequestMetricsCallback:  doNothingMetricsCallback,
+		ResponseMetricsCallback: doNothingMetricsCallback,
+	}, nil
+}
+
+func createHttpTransport(customCACert []byte) http.RoundTripper {
 	if len(customCACert) != 0 {
 		caCertPool := x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(customCACert)
 
-		transport := &http.Transport{
+		return &http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs: caCertPool,
 			},
 		}
-
-		return &HttpClientImpl{
-			HttpClient: &http.Client{
-				Transport: transport,
-				Timeout:   timeout,
-			},
-			RequestManipulator:      requestManipulator,
-			Now:                     time.Now,
-			RequestMetricsCallback:  doNothingMetricsCallback,
-			ResponseMetricsCallback: doNothingMetricsCallback,
-		}, nil
-	} else {
-		return &HttpClientImpl{
-			HttpClient: &http.Client{
-				Timeout: timeout,
-			},
-			RequestManipulator:      requestManipulator,
-			Now:                     time.Now,
-			RequestMetricsCallback:  doNothingMetricsCallback,
-			ResponseMetricsCallback: doNothingMetricsCallback,
-		}, nil
 	}
+	return http.DefaultTransport
 }
 
 // Instrument adds instrumentation to a http client.
@@ -134,7 +128,7 @@ func (c *HttpClientImpl) Perform(ctx context.Context, method string, requestUrl 
 	response.Header = responseInternal.Header
 	response.Status = responseInternal.StatusCode
 
-	responseBody, err := ioutil.ReadAll(responseInternal.Body)
+	responseBody, err := io.ReadAll(responseInternal.Body)
 	if err != nil {
 		_ = responseInternal.Body.Close()
 		c.ResponseMetricsCallback(ctx, method, requestUrl, response.Status, err, c.Now().Sub(response.Time), 0)
