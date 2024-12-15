@@ -23,8 +23,11 @@ func (c *RequestCaptureImpl) RoundTrip(req *http.Request) (*http.Response, error
 
 	err := c.Wrapped.Perform(req.Context(), req.Method, req.URL.String(), req.Body, &parsedResponse)
 
-	newReader := strings.NewReader(string(**(parsedResponse.Body.(**[]byte))))
-	readCloser := io.NopCloser(newReader)
+	var readCloser io.ReadCloser
+	if parsedResponse.Body != nil {
+		newReader := strings.NewReader(string(**(parsedResponse.Body.(**[]byte))))
+		readCloser = io.NopCloser(newReader)
+	}
 
 	return &http.Response{
 		Status:           "",
